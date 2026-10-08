@@ -25,6 +25,11 @@ import {
   Train,
   ShoppingBag,
   HelpCircle,
+  Share2,
+  Check,
+  Eye,
+  Navigation2,
+  Globe,
 } from 'lucide-react';
 import { Place, MapViewport, PlaceCategory } from '../types.ts';
 import { CITY_PRESETS } from '../data/presets.ts';
@@ -36,6 +41,9 @@ interface MapComponentProps {
   selectedPlace: Place | null;
   onSelectPlace: (place: Place | null) => void;
   onAskAboutPlace: (place: Place) => void;
+  onShareLink?: () => void;
+  linkCopied?: boolean;
+  onOpenLocationPicker?: () => void;
 }
 
 const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<{ className?: string }>> = {
@@ -67,6 +75,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   selectedPlace,
   onSelectPlace,
   onAskAboutPlace,
+  onShareLink,
+  linkCopied,
+  onOpenLocationPicker,
 }) => {
   const map = useMap();
   const geocodingLib = useMapsLibrary('geocoding');
@@ -82,6 +93,21 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Map click handler to choose any spot in the world
+  const handleMapClick = useCallback(
+    (e: any) => {
+      const latLng = e.detail?.latLng;
+      if (!latLng) return;
+      const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
+      const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
+      if (lat != null && lng != null) {
+        resolveLocationName(lat, lng);
+        showToast(`📍 Set location on map: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      }
+    },
+    []
+  );
 
   // Initialize geocoder when library loads
   useEffect(() => {
@@ -251,8 +277,21 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       {/* Top Floating Controls Bar */}
       <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        {/* Left Toolbar: Search & City Presets */}
+        {/* Left Toolbar: Location Picker & Search */}
         <div className="flex items-center gap-2 pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-1.5 shadow-xl">
+          {/* Prominent Location & Whole World Button */}
+          {onOpenLocationPicker && (
+            <button
+              onClick={onOpenLocationPicker}
+              title="Choose current location, whole world, or global cities"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer border border-blue-400/30 shrink-0"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Choose Location</span>
+              <span className="sm:hidden">Location</span>
+            </button>
+          )}
+
           {/* Quick Search Form */}
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5 px-2">
             <Search className="w-4 h-4 text-slate-400" />
@@ -260,8 +299,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search any place, city, or address..."
-              className="bg-transparent text-xs md:text-sm text-slate-100 placeholder-slate-400 outline-none w-40 sm:w-56"
+              placeholder="Search any place in the world..."
+              className="bg-transparent text-xs md:text-sm text-slate-100 placeholder-slate-400 outline-none w-36 sm:w-52"
             />
           </form>
 
@@ -273,11 +312,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             <select
               value={selectedCity}
               onChange={(e) => handleCitySelect(e.target.value)}
-              className="bg-slate-800 text-xs text-slate-200 rounded-lg px-2 py-1 outline-none border border-slate-700 cursor-pointer hover:bg-slate-750"
+              className="bg-slate-800 text-xs text-slate-200 rounded-lg px-2 py-1 outline-none border border-slate-700 cursor-pointer hover:bg-slate-750 max-w-[130px] truncate"
             >
               {CITY_PRESETS.map((city) => (
                 <option key={city.name} value={city.name}>
-                  {city.name}
+                  {city.flag ? `${city.flag} ` : ''}{city.name}
                 </option>
               ))}
             </select>
@@ -308,11 +347,30 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             <Navigation className={`w-4 h-4 ${isLocating ? 'animate-spin text-blue-400' : ''}`} />
           </button>
 
+          {/* Share Web Link */}
+          {onShareLink && (
+            <button
+              onClick={onShareLink}
+              title={linkCopied ? 'Web link copied!' : 'Share Web Link with current map view'}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                linkCopied
+                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
+                  : 'bg-slate-800 hover:bg-slate-750 text-slate-300 border-slate-700'
+              }`}
+            >
+              {linkCopied ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </button>
+          )}
+
           {/* Map Type Toggle */}
           <button
             onClick={() => setMapType((t) => (t === 'roadmap' ? 'satellite' : 'roadmap'))}
             title="Toggle Satellite Imagery"
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition-colors cursor-pointer ${
               mapType === 'satellite'
                 ? 'bg-blue-600 text-white border-blue-500 font-medium'
                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-750'
@@ -337,6 +395,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           gestureHandling="greedy"
           disableDefaultUI={false}
           onCameraChanged={handleCameraChange}
+          onClick={handleMapClick}
           style={{ width: '100%', height: '100%' }}
         >
           {/* Active Place Markers */}
@@ -408,26 +467,50 @@ export const MapComponent: React.FC<MapComponentProps> = ({
                 )}
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100">
                   <button
                     onClick={() => onAskAboutPlace(selectedPlace)}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
-                    <span>Ask GeoChat</span>
+                    <span>Ask GeoChat about this spot</span>
                   </button>
 
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      `${selectedPlace.name} ${selectedPlace.address || ''}`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
-                    title="View on Google Maps"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${selectedPlace.lat},${selectedPlace.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                      title="Get Directions in Google Maps Web"
+                    >
+                      <Navigation2 className="w-3 h-3 text-blue-500" />
+                      <span>Directions</span>
+                    </a>
+
+                    <a
+                      href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selectedPlace.lat},${selectedPlace.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-700 hover:text-blue-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                      title="Open Street View Web"
+                    >
+                      <Eye className="w-3 h-3 text-amber-500" />
+                      <span>Street View</span>
+                    </a>
+
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        `${selectedPlace.name} ${selectedPlace.address || ''}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1 text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors"
+                      title="Open in Google Maps Web"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
                 </div>
               </div>
             </InfoWindow>
@@ -437,15 +520,24 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       {/* Bottom Floating Info Strip */}
       <div className="absolute bottom-3 left-3 z-10 pointer-events-none">
-        <div className="flex items-center gap-2 bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl px-3 py-1.5 text-xs text-slate-300 shadow-xl pointer-events-auto">
-          <MapPin className="w-3.5 h-3.5 text-blue-400" />
-          <span className="font-medium text-slate-200 truncate max-w-[200px] sm:max-w-xs">
+        <button
+          onClick={onOpenLocationPicker}
+          title="Click to choose a new location, use GPS, or explore the whole world"
+          className="flex items-center gap-2 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-blue-500 rounded-xl px-3 py-1.5 text-xs text-slate-200 shadow-xl pointer-events-auto transition-colors cursor-pointer group"
+        >
+          <MapPin className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+          <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
             {viewport.locationName || 'Exploring Region'}
           </span>
           <span className="text-slate-500 text-[10px]">
             {viewport.center.lat.toFixed(4)}, {viewport.center.lng.toFixed(4)}
           </span>
-        </div>
+          {onOpenLocationPicker && (
+            <span className="text-[10px] text-blue-400 font-semibold underline ml-0.5">
+              Change
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );

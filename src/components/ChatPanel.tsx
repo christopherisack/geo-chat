@@ -23,6 +23,8 @@ import {
   HelpCircle,
   Layers,
   Info,
+  Share2,
+  PanelLeftClose,
 } from 'lucide-react';
 import { ChatMessage, Place, MapViewport, PersonaId, PlaceCategory } from '../types.ts';
 import { PERSONAS, SAMPLE_PROMPTS } from '../data/presets.ts';
@@ -37,6 +39,10 @@ interface ChatPanelProps {
   onClearHistory: () => void;
   inputPrompt: string;
   setInputPrompt: (val: string) => void;
+  onShareLink?: () => void;
+  linkCopied?: boolean;
+  onToggleSidebar?: () => void;
+  onOpenLocationPicker?: () => void;
 }
 
 const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<{ className?: string }>> = {
@@ -60,6 +66,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   onClearHistory,
   inputPrompt,
   setInputPrompt,
+  onShareLink,
+  linkCopied,
+  onToggleSidebar,
+  onOpenLocationPicker,
 }) => {
   const [selectedPersonaId, setSelectedPersonaId] = useState<PersonaId>('guide');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -99,7 +109,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 text-slate-100 overflow-hidden">
+    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 text-slate-100 overflow-hidden select-text">
       {/* Top Header */}
       <div className="p-3.5 border-b border-slate-800 bg-slate-900/90 backdrop-blur-sm flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-2.5">
@@ -112,25 +122,65 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <div className="flex items-center gap-1.5">
               <h1 className="font-bold text-sm tracking-tight text-white">GeoChat</h1>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                Maps AI
+                Web App
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-slate-400 truncate max-w-[190px]">
-              <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span className="truncate">{viewport.locationName || 'Current Location'}</span>
-            </div>
+            {onOpenLocationPicker ? (
+              <button
+                onClick={onOpenLocationPicker}
+                title="Click to choose location: GPS, Whole World, or Global Cities"
+                className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-blue-300 truncate max-w-[190px] cursor-pointer transition-colors text-left group"
+              >
+                <MapPin className="w-3 h-3 text-emerald-400 shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="truncate">{viewport.locationName || 'Current Location'}</span>
+                <span className="text-[10px] text-blue-400 font-semibold underline shrink-0 ml-0.5">Edit</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-1 text-[11px] text-slate-400 truncate max-w-[190px]">
+                <MapPin className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="truncate">{viewport.locationName || 'Current Location'}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Clear History & Persona Info */}
-        <div className="flex items-center gap-1.5">
+        {/* Header Action Buttons: Share Link, Clear History, Collapse Sidebar */}
+        <div className="flex items-center gap-1">
+          {onShareLink && (
+            <button
+              onClick={onShareLink}
+              title={linkCopied ? 'Web link copied!' : 'Share Web Link'}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                linkCopied
+                  ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
+                  : 'bg-slate-800 hover:bg-slate-750 border-slate-700/80 text-slate-300 hover:text-white'
+              }`}
+            >
+              {linkCopied ? (
+                <Check className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Share2 className="w-4 h-4" />
+              )}
+            </button>
+          )}
+
           {messages.length > 0 && (
             <button
               onClick={onClearHistory}
               title="Reset conversation"
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             >
               <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
+
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              title="Hide sidebar to view full map"
+              className="hidden md:flex p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            >
+              <PanelLeftClose className="w-4 h-4" />
             </button>
           )}
         </div>
