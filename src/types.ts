@@ -46,6 +46,22 @@ export interface MapViewport {
 
 export type PersonaId = 'guide' | 'concierge' | 'scout' | 'historian';
 
+export type DrawingMode = 'none' | 'distance' | 'polygon';
+
+export type MeasurementUnit = 'metric' | 'imperial' | 'nautical';
+
+export interface LatLngPoint {
+  lat: number;
+  lng: number;
+}
+
+export interface DrawingMeasurement {
+  mode: DrawingMode;
+  points: LatLngPoint[];
+  totalDistanceMeters: number;
+  totalAreaSquareMeters?: number;
+}
+
 export interface PersonaConfig {
   id: PersonaId;
   name: string;

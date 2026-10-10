@@ -25,6 +25,9 @@ import {
   Info,
   Share2,
   PanelLeftClose,
+  MessageCircle,
+  Mail,
+  User,
 } from 'lucide-react';
 import { ChatMessage, Place, MapViewport, PersonaId, PlaceCategory } from '../types.ts';
 import { PERSONAS, SAMPLE_PROMPTS } from '../data/presets.ts';
@@ -43,6 +46,7 @@ interface ChatPanelProps {
   linkCopied?: boolean;
   onToggleSidebar?: () => void;
   onOpenLocationPicker?: () => void;
+  onOpenContact?: () => void;
 }
 
 const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<{ className?: string }>> = {
@@ -70,6 +74,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   linkCopied,
   onToggleSidebar,
   onOpenLocationPicker,
+  onOpenContact,
 }) => {
   const [selectedPersonaId, setSelectedPersonaId] = useState<PersonaId>('guide');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -146,6 +151,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Header Action Buttons: Share Link, Clear History, Collapse Sidebar */}
         <div className="flex items-center gap-1">
+          {onOpenContact && (
+            <button
+              onClick={onOpenContact}
+              title="Contact Developer Isack Christopher (WhatsApp: +255747689977)"
+              className="p-1.5 rounded-lg border border-blue-500/30 bg-blue-950/40 hover:bg-blue-900/60 text-blue-300 hover:text-white transition-all cursor-pointer"
+            >
+              <User className="w-4 h-4 text-cyan-400" />
+            </button>
+          )}
+
           {onShareLink && (
             <button
               onClick={onShareLink}
@@ -260,6 +275,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   <Send className="w-3.5 h-3.5 text-slate-500 group-hover:text-blue-400 transition-colors" />
                 </button>
               ))}
+            </div>
+
+            {/* Developer Credit & Direct Contact Links */}
+            <div className="w-full mt-4 p-3 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-blue-950/40 border border-blue-500/20 text-center">
+              <div className="text-[11px] font-semibold text-blue-200 mb-1.5 flex items-center justify-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-cyan-400" />
+                <span>Developed by Isack Christopher</span>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2 text-[11px]">
+                <a
+                  href="https://wa.me/255747689977"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-white border border-emerald-500/40 transition-colors shadow-sm"
+                  title="Chat with Isack Christopher on WhatsApp: +255747689977"
+                >
+                  <MessageCircle className="w-3 h-3 text-emerald-400" />
+                  <span>WhatsApp: +255747689977</span>
+                </a>
+                <a
+                  href="mailto:christopherisack64@gmail.com"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-950/60 hover:bg-blue-900/80 text-blue-300 hover:text-white border border-blue-500/40 transition-colors shadow-sm"
+                  title="Email Isack Christopher: christopherisack64@gmail.com"
+                >
+                  <Mail className="w-3 h-3 text-blue-400" />
+                  <span>Email Me</span>
+                </a>
+              </div>
             </div>
           </div>
         ) : (

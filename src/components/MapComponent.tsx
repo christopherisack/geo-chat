@@ -30,9 +30,12 @@ import {
   Eye,
   Navigation2,
   Globe,
+  Ruler,
+  Hexagon,
 } from 'lucide-react';
-import { Place, MapViewport, PlaceCategory } from '../types.ts';
+import { Place, MapViewport, PlaceCategory, DrawingMode, LatLngPoint, DrawingMeasurement } from '../types.ts';
 import { CITY_PRESETS } from '../data/presets.ts';
+import { DrawingOverlay } from './DrawingOverlay.tsx';
 
 interface MapComponentProps {
   viewport: MapViewport;
@@ -44,6 +47,11 @@ interface MapComponentProps {
   onShareLink?: () => void;
   linkCopied?: boolean;
   onOpenLocationPicker?: () => void;
+  drawingMode: DrawingMode;
+  onDrawingModeChange: (mode: DrawingMode) => void;
+  drawingPoints: LatLngPoint[];
+  onDrawingPointsChange: (points: LatLngPoint[]) => void;
+  onAskAboutDrawing: (measurement: DrawingMeasurement) => void;
 }
 
 const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<{ className?: string }>> = {
@@ -78,6 +86,11 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   onShareLink,
   linkCopied,
   onOpenLocationPicker,
+  drawingMode,
+  onDrawingModeChange,
+  drawingPoints,
+  onDrawingPointsChange,
+  onAskAboutDrawing,
 }) => {
   const map = useMap();
   const geocodingLib = useMapsLibrary('geocoding');
@@ -94,7 +107,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Map click handler to choose any spot in the world
+  // Map click handler to choose any spot in the world OR add drawing waypoint
   const handleMapClick = useCallback(
     (e: any) => {
       const latLng = e.detail?.latLng;
@@ -102,11 +115,15 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
       const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
       if (lat != null && lng != null) {
-        resolveLocationName(lat, lng);
-        showToast(`📍 Set location on map: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        if (drawingMode !== 'none') {
+          onDrawingPointsChange([...drawingPoints, { lat, lng }]);
+        } else {
+          resolveLocationName(lat, lng);
+          showToast(`📍 Set location on map: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        }
       }
     },
-    []
+    [drawingMode, drawingPoints, onDrawingPointsChange]
   );
 
   // Initialize geocoder when library loads
@@ -278,13 +295,13 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       {/* Top Floating Controls Bar */}
       <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
         {/* Left Toolbar: Location Picker & Search */}
-        <div className="flex items-center gap-2 pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-1.5 shadow-xl">
+        <div className="flex items-center gap-2 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-blue-500/30 rounded-xl p-1.5 shadow-xl shadow-blue-950/40">
           {/* Prominent Location & Whole World Button */}
           {onOpenLocationPicker && (
             <button
               onClick={onOpenLocationPicker}
               title="Choose current location, whole world, or global cities"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer border border-blue-400/30 shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer border border-cyan-400/30 shrink-0"
             >
               <Globe className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Choose Location</span>
@@ -294,7 +311,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
           {/* Quick Search Form */}
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-1.5 px-2">
-            <Search className="w-4 h-4 text-slate-400" />
+            <Search className="w-4 h-4 text-blue-400" />
             <input
               type="text"
               value={searchQuery}
@@ -304,15 +321,15 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             />
           </form>
 
-          <div className="w-[1px] h-6 bg-slate-700 mx-1" />
+          <div className="w-[1px] h-6 bg-blue-800/40 mx-1" />
 
           {/* Quick City Presets Dropdown */}
           <div className="flex items-center gap-1 px-1">
-            <Compass className="w-3.5 h-3.5 text-blue-400" />
+            <Compass className="w-3.5 h-3.5 text-cyan-400" />
             <select
               value={selectedCity}
               onChange={(e) => handleCitySelect(e.target.value)}
-              className="bg-slate-800 text-xs text-slate-200 rounded-lg px-2 py-1 outline-none border border-slate-700 cursor-pointer hover:bg-slate-750 max-w-[130px] truncate"
+              className="bg-slate-800 text-xs text-slate-200 rounded-lg px-2 py-1 outline-none border border-blue-500/30 cursor-pointer hover:bg-slate-750 max-w-[130px] truncate"
             >
               {CITY_PRESETS.map((city) => (
                 <option key={city.name} value={city.name}>
@@ -324,7 +341,46 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         </div>
 
         {/* Right Toolbar: View buttons */}
-        <div className="flex items-center gap-1.5 pointer-events-auto bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl p-1.5 shadow-xl">
+        <div className="flex items-center gap-1.5 pointer-events-auto bg-slate-900/95 backdrop-blur-md border border-blue-500/30 rounded-xl p-1.5 shadow-xl shadow-blue-950/40">
+          {/* Drawing & Measuring Buttons */}
+          <button
+            onClick={() => onDrawingModeChange(drawingMode === 'distance' ? 'none' : 'distance')}
+            title="Measure distance between points on map"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              drawingMode === 'distance'
+                ? 'bg-cyan-600 text-white border-cyan-400 shadow-md shadow-cyan-900/40'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-cyan-300 hover:bg-slate-750'
+            }`}
+          >
+            <Ruler className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Measure</span>
+            {drawingPoints.length > 0 && drawingMode === 'distance' && (
+              <span className="w-3.5 h-3.5 rounded-full bg-cyan-950 text-cyan-200 text-[9px] flex items-center justify-center font-bold">
+                {drawingPoints.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => onDrawingModeChange(drawingMode === 'polygon' ? 'none' : 'polygon')}
+            title="Draw polygon area of interest on map"
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              drawingMode === 'polygon'
+                ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-900/40'
+                : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-blue-300 hover:bg-slate-750'
+            }`}
+          >
+            <Hexagon className="w-3.5 h-3.5 text-blue-400" />
+            <span className="hidden sm:inline">Draw Area</span>
+            {drawingPoints.length > 0 && drawingMode === 'polygon' && (
+              <span className="w-3.5 h-3.5 rounded-full bg-blue-950 text-blue-200 text-[9px] flex items-center justify-center font-bold">
+                {drawingPoints.length}
+              </span>
+            )}
+          </button>
+
+          <div className="w-[1px] h-6 bg-slate-700 mx-0.5 hidden sm:block" />
+
           {/* Fit all places button */}
           {places.length > 0 && (
             <button
@@ -396,8 +452,20 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           disableDefaultUI={false}
           onCameraChanged={handleCameraChange}
           onClick={handleMapClick}
-          style={{ width: '100%', height: '100%' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            cursor: drawingMode !== 'none' ? 'crosshair' : undefined,
+          }}
         >
+          {/* Drawing & Distance Measurement Overlay */}
+          <DrawingOverlay
+            mode={drawingMode}
+            onModeChange={onDrawingModeChange}
+            points={drawingPoints}
+            onPointsChange={onDrawingPointsChange}
+            onAskAboutDrawing={onAskAboutDrawing}
+          />
           {/* Active Place Markers */}
           {places.map((place) => {
             const isSelected = selectedPlace?.id === place.id;
@@ -523,17 +591,17 @@ export const MapComponent: React.FC<MapComponentProps> = ({
         <button
           onClick={onOpenLocationPicker}
           title="Click to choose a new location, use GPS, or explore the whole world"
-          className="flex items-center gap-2 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 hover:border-blue-500 rounded-xl px-3 py-1.5 text-xs text-slate-200 shadow-xl pointer-events-auto transition-colors cursor-pointer group"
+          className="flex items-center gap-2 bg-slate-900/95 backdrop-blur-md border border-blue-500/30 hover:border-cyan-400 rounded-xl px-3 py-1.5 text-xs text-slate-200 shadow-xl pointer-events-auto transition-colors cursor-pointer group"
         >
-          <MapPin className="w-3.5 h-3.5 text-blue-400 group-hover:scale-110 transition-transform" />
+          <MapPin className="w-3.5 h-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
           <span className="font-semibold text-white truncate max-w-[200px] sm:max-w-xs">
             {viewport.locationName || 'Exploring Region'}
           </span>
-          <span className="text-slate-500 text-[10px]">
+          <span className="text-blue-300 text-[10px]">
             {viewport.center.lat.toFixed(4)}, {viewport.center.lng.toFixed(4)}
           </span>
           {onOpenLocationPicker && (
-            <span className="text-[10px] text-blue-400 font-semibold underline ml-0.5">
+            <span className="text-[10px] text-cyan-400 font-semibold underline ml-0.5">
               Change
             </span>
           )}

@@ -20,7 +20,11 @@ import {
 import { MapComponent } from './components/MapComponent.tsx';
 import { ChatPanel } from './components/ChatPanel.tsx';
 import { LocationPickerModal } from './components/LocationPickerModal.tsx';
-import { ChatMessage, Place, MapViewport, PersonaId } from './types.ts';
+import { DigitalClock } from './components/DigitalClock.tsx';
+import { ContactModal } from './components/ContactModal.tsx';
+import { DeveloperProfileModal } from './components/DeveloperProfileModal.tsx';
+import { FooterBar } from './components/FooterBar.tsx';
+import { ChatMessage, Place, MapViewport, PersonaId, DrawingMode, LatLngPoint, DrawingMeasurement } from './types.ts';
 import { CITY_PRESETS, WORLD_OVERVIEW, CityPreset, PERSONAS } from './data/presets.ts';
 
 const GOOGLE_MAPS_API_KEY =
@@ -69,6 +73,16 @@ export default function App() {
 
   // Selected place for InfoWindow / inspection
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
+
+  // Contact Me modal state
+  const [isContactOpen, setIsContactOpen] = useState(false);
+
+  // Developer Profile modal state
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Drawing overlay state (distance measurement & polygon areas)
+  const [drawingMode, setDrawingMode] = useState<DrawingMode>('none');
+  const [drawingPoints, setDrawingPoints] = useState<LatLngPoint[]>([]);
 
   // Sync viewport to web URL query parameters without reloading
   useEffect(() => {
@@ -185,7 +199,7 @@ export default function App() {
 
   // Send message to Gemini server API
   const handleSendMessage = useCallback(
-    async (text: string, personaId: PersonaId) => {
+    async (text: string, personaId: PersonaId = 'guide') => {
       if (!text.trim() || isLoading) return;
 
       const userMessage: ChatMessage = {
@@ -283,6 +297,35 @@ export default function App() {
     }
   };
 
+  const handleAskAboutDrawing = useCallback(
+    (measurement: DrawingMeasurement) => {
+      let prompt = '';
+      if (measurement.mode === 'distance') {
+        const km = (measurement.totalDistanceMeters / 1000).toFixed(2);
+        const miles = (measurement.totalDistanceMeters * 0.000621371).toFixed(2);
+        const walkMinutes = Math.round(measurement.totalDistanceMeters / 80);
+        prompt = `I measured a route of ${km} km (${miles} miles, approximately ${walkMinutes} minutes walking time) with ${measurement.points.length} waypoints in ${viewport.locationName}. What are the highlights, terrain conditions, walking tips, and recommended spots along this route?`;
+      } else if (measurement.mode === 'polygon') {
+        const sqKm = measurement.totalAreaSquareMeters
+          ? (measurement.totalAreaSquareMeters / 1000000).toFixed(2)
+          : '0';
+        const acres = measurement.totalAreaSquareMeters
+          ? (measurement.totalAreaSquareMeters * 0.000247105).toFixed(1)
+          : '0';
+        prompt = `I defined a polygon area of interest of ~${acres} acres (${sqKm} km²) around ${viewport.locationName}. What is this specific neighborhood or area known for, what are the top places to visit or dine inside it, and what are its key features?`;
+      }
+
+      if (prompt) {
+        setInputPrompt('');
+        if (window.innerWidth < 768) {
+          setMobileTab('chat');
+        }
+        handleSendMessage(prompt);
+      }
+    },
+    [viewport.locationName, handleSendMessage]
+  );
+
   const handleClearHistory = () => {
     setMessages([]);
     setSelectedPlace(null);
@@ -307,6 +350,103 @@ export default function App() {
           </span>
         </div>
       )}
+
+      {/* Top Application Header Bar with Live Digital Clock & Contact Controls */}
+      <header className="w-full bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-blue-900/40 px-3 sm:px-4 py-2 shrink-0 z-30 flex items-center justify-between gap-2 select-none shadow-md">
+        {/* Left: Branding & Tagline */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-500 to-cyan-400 p-0.5 shadow-md shadow-blue-600/30 shrink-0">
+            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
+            </div>
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-sm sm:text-base text-white tracking-tight bg-gradient-to-r from-white via-blue-100 to-cyan-300 bg-clip-text text-transparent">
+                GeoChat AI
+              </span>
+              <span className="hidden sm:inline-block text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-cyan-300 border border-blue-400/30 uppercase tracking-wider">
+                Real-Time Maps
+              </span>
+            </div>
+            <p className="hidden md:block text-[10px] text-blue-200/80 truncate">
+              Interactive Map Intelligence & Gemini Grounded AI
+            </p>
+          </div>
+        </div>
+
+        {/* Center: Stylish Live Digital Clock */}
+        <div className="flex items-center justify-center">
+          <DigitalClock />
+        </div>
+
+        {/* Right: Quick Action Controls (Contact Me, Profile, Location, Share) */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Developer Profile Button */}
+          <button
+            onClick={() => setIsProfileOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 hover:text-cyan-300 text-xs font-semibold border border-blue-500/35 transition-all cursor-pointer shadow-sm group"
+            title="View Isack Christopher's professional background & education"
+          >
+            <div className="w-5 h-5 rounded-full overflow-hidden border border-cyan-400 shrink-0 bg-slate-800">
+              <img
+                src="https://isackchristopher.netlify.app/profile.jpg"
+                alt="Isack Christopher"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLElement).style.display = 'none';
+                }}
+              />
+            </div>
+            <span className="hidden lg:inline">Isack Christopher</span>
+            <span className="hidden sm:inline lg:hidden">Profile</span>
+          </button>
+
+          {/* Contact Me Button */}
+          <button
+            onClick={() => setIsContactOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold shadow-md shadow-blue-900/40 border border-cyan-400/30 transition-all cursor-pointer group"
+            title="Contact Developer Isack Christopher (WhatsApp: +255747689977 | christopherisack64@gmail.com)"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-cyan-200 group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline">Contact Me</span>
+            <span className="sm:hidden">Contact</span>
+          </button>
+
+          {/* Quick Location Button */}
+          <button
+            onClick={() => setIsLocationPickerOpen(true)}
+            className="hidden md:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-blue-200 border border-blue-500/30 text-xs font-semibold transition-colors cursor-pointer"
+            title="Explore any place or whole world"
+          >
+            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            <span className="truncate max-w-[110px]">{viewport.locationName || 'Location'}</span>
+          </button>
+
+          {/* Share Web Link */}
+          <button
+            onClick={handleCopyShareLink}
+            title={linkCopied ? 'Link Copied to Clipboard!' : 'Share Web Link'}
+            className={`p-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border transition-all text-xs font-medium flex items-center gap-1 cursor-pointer ${
+              linkCopied
+                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
+                : 'bg-slate-900 hover:bg-slate-850 border-blue-500/30 text-slate-300 hover:text-white'
+            }`}
+          >
+            {linkCopied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline text-[11px]">Copied</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline text-[11px]">Share</span>
+              </>
+            )}
+          </button>
+        </div>
+      </header>
 
       {/* Main Dual-Pane Workspace */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
@@ -339,6 +479,7 @@ export default function App() {
             linkCopied={linkCopied}
             onToggleSidebar={() => setIsSidebarOpen(false)}
             onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
+            onOpenContact={() => setIsContactOpen(true)}
           />
         </div>
 
@@ -347,7 +488,7 @@ export default function App() {
           <button
             onClick={() => setIsSidebarOpen(true)}
             title="Expand GeoChat Panel"
-            className="hidden md:flex absolute top-3 left-3 z-30 items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-200 border border-slate-700 shadow-2xl backdrop-blur-md transition-all cursor-pointer font-medium text-xs group"
+            className="hidden md:flex absolute top-3 left-3 z-30 items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 text-slate-200 border border-blue-500/30 shadow-2xl backdrop-blur-md transition-all cursor-pointer font-medium text-xs group"
           >
             <PanelLeftOpen className="w-4 h-4 text-blue-400 group-hover:scale-110 transition-transform" />
             <span>Open GeoChat</span>
@@ -383,13 +524,18 @@ export default function App() {
               onShareLink={handleCopyShareLink}
               linkCopied={linkCopied}
               onOpenLocationPicker={() => setIsLocationPickerOpen(true)}
+              drawingMode={drawingMode}
+              onDrawingModeChange={setDrawingMode}
+              drawingPoints={drawingPoints}
+              onDrawingPointsChange={setDrawingPoints}
+              onAskAboutDrawing={handleAskAboutDrawing}
             />
           </APIProvider>
         </div>
       </div>
 
       {/* Mobile Bottom Navigation Bar (Split View, Full Map, Full Chat) */}
-      <div className="md:hidden flex items-center justify-around bg-slate-900 border-t border-slate-800 py-2 px-3 shrink-0 z-30">
+      <div className="md:hidden flex items-center justify-around bg-slate-950 border-t border-blue-900/40 py-2 px-3 shrink-0 z-30">
         <button
           onClick={() => setMobileTab('split')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -437,6 +583,12 @@ export default function App() {
         </button>
       </div>
 
+      {/* Developer Credit & Dynamic Copyright Footer Bar */}
+      <FooterBar
+        onOpenContact={() => setIsContactOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
+      />
+
       {/* Location Chooser Modal (GPS / Whole World / Search / Global Cities) */}
       <LocationPickerModal
         isOpen={isLocationPickerOpen}
@@ -446,6 +598,19 @@ export default function App() {
         onUseCurrentLocation={handleUseCurrentLocation}
         onSearchLocation={handleSearchLocation}
         isLocating={isLocating}
+      />
+
+      {/* Contact Developer Modal with WhatsApp & Email */}
+      <ContactModal
+        isOpen={isContactOpen}
+        onClose={() => setIsContactOpen(false)}
+        onOpenProfile={() => setIsProfileOpen(true)}
+      />
+
+      {/* Developer Profile Modal based on isackchristopher.netlify.app */}
+      <DeveloperProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
       />
     </div>
   );
